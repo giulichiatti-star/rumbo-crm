@@ -248,7 +248,7 @@ textarea.inp{min-height:60px;margin-top:6px}
 .login label{display:block;margin-bottom:12px;font-weight:700;font-size:13px}.login label .inp{margin-top:4px;font-weight:500}
 .lmsg{min-height:22px;font-size:13px;font-weight:600;color:var(--red);margin-bottom:8px}.lmsg.ok{color:var(--green)}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js" defer></script>
 </head>
 <body>
 <header>
@@ -1092,7 +1092,7 @@ render();chatR();
 
 /* ---------- sincronización (Supabase) ---------- */
 // Completá estos dos datos con los de tu proyecto de Supabase. Si quedan vacíos, la app funciona solo en este aparato.
-const SUPA={url:'',key:''};
+const SUPA={url:'https://kyowmixxdoiohzmfvhpf.supabase.co',key:'sb_publishable_m5A6ucgIWhujD-uSGLMFjw_ChYJaM3t'};
 let sb=null;
 function syncStatus(t,c){const e=$('#sync');e.textContent=t;e.className='sync '+(c||'')}
 async function pushNow(){
