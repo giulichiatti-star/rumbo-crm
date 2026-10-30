@@ -305,7 +305,12 @@ const pct=(x,d=1)=>(x*100).toFixed(d).replace('.',',').replace('-','−')+'%';
 const dec=(x,d=2)=>Number(x).toFixed(d).replace('.',',');
 const hhmm=t=>new Date(t).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
 const MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const ym=s=>MES[+s.slice(5,7)-1]+' '+s.slice(2,4);
+const ym=s=>s.slice(0,7).replace('-','/');           // mes: aaaa/mm
+const mn3=s=>MES[+s.slice(5,7)-1];                    // nombre corto del mes, solo para los ejes de los gráficos
+const fd=s=>String(s).replace(/-/g,'/');              // fecha: aaaa/mm/dd
+const fdt=t=>{const d=new Date(t);return d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0')};
+const PAT_FECHA='\\d{4}/(0[1-9]|1[0-2])/(0[1-9]|[12]\\d|3[01])',PAT_MES='\\d{4}/(0[1-9]|1[0-2])';
+const campoFecha=(name,val,mes)=>`<input class="inp" name="${name}" value="${fd(val)}" inputmode="numeric" placeholder="${mes?'aaaa/mm':'aaaa/mm/dd'}" pattern="${mes?PAT_MES:PAT_FECHA}" title="Escribí la fecha como ${mes?'aaaa/mm (ej. 2026/11)':'aaaa/mm/dd (ej. 2026/11/05)'}" required>`;
 const slug=e=>e.replace(/\s/g,'-');
 const ETAPAS=['Prospecto','Diagnóstico','Propuesta','Cliente activo','Pausado'];
 const LSTATES=['Planificado','En pasto','En corral','Listo','Cerrado'];
@@ -571,7 +576,7 @@ function vMercado(){
   return `<div class="bar"><div><h1>Mercado</h1><p class="sub" style="margin:0">Una fila por mes, igual que la hoja Mercado del modelo.</p></div><span class="sp"></span><button class="btn pri" data-act="newPrecio">+ Cargar precios del mes</button></div>
   <p class="note">Los precios vienen precargados del Excel (notas ROSGAN e INMAG, marcadas "verificar" en el archivo). Revisalos antes de usarlos con clientes.</p>
   <div class="bar">${Object.entries(SERIES).map(([k,v])=>`<button class="chip ${UI.serie===k?'on':''}" data-act="serie" data-v="${k}">${v[0].split(' (')[0]}</button>`).join('')}</div>
-  <h2>${s[0]}</h2>${lineSVG(M.map(r=>ym(r.f+'-01').slice(0,3)),[{n:s[0],c:s[2],v:M.map(s[1])}],f)}
+  <h2>${s[0]}</h2>${lineSVG(M.map(r=>mn3(r.f+'-01')),[{n:s[0],c:s[2],v:M.map(s[1])}],f)}
   <div class="cols" style="margin-top:34px"><div>
     <h2>Relaciones por mes</h2>
     <div class="tablewrap"><table><thead><tr><th>Mes</th><th class="num">Gordo</th><th class="num">Inv./gordo</th><th class="num">Kg maíz</th><th class="num">US$/kg</th></tr></thead>
@@ -605,10 +610,10 @@ function drawerCliente(c){
   ${ls.length?`<ul class="list">${ls.map(l=>`<li><div class="tx"><button class="link" data-act="openLote" data-id="${l.id}">Lote ${l.id} · ${esc(l.nombre)}</button><small>${esc(l.sis)} · ${l.cab} cab. · ${ym(l.ing+'-01')} → ${ym(l.ven+'-01')}</small></div><span class="num ${l.margen>=0?'ok':'crit'}">${short(l.margen)}<br><small>TIR ${pct(l.tir,0)}</small></span></li>`).join('')}</ul>`:'<p class="label">Todavía no tiene lotes. Creá uno desde Lotes.</p>'}
   ${ts.length?`<h2 style="font-size:18px;margin-top:22px">Tareas abiertas</h2><ul class="list">${ts.map(taskLi).join('')}</ul>`:''}
   <h2 style="font-size:18px;margin-top:22px">Notas</h2>
-  ${c.notas.map(x=>`<p style="margin:0 0 10px"><span class="label">${x.d} · ${esc(x.a)}</span><br>${esc(x.t)}</p>`).join('')||'<p class="label">Sin notas.</p>'}
+  ${c.notas.map(x=>`<p style="margin:0 0 10px"><span class="label">${fd(x.d)} · ${esc(x.a)}</span><br>${esc(x.t)}</p>`).join('')||'<p class="label">Sin notas.</p>'}
   <form data-act="noteForm" data-id="${c.id}"><textarea class="inp" name="t" placeholder="Agregar una nota…" required></textarea><button class="btn sm" style="margin-top:6px">Guardar nota</button></form>
   <h2 style="font-size:18px;margin-top:22px">Historial</h2>
-  <div class="tl">${c.hist.slice().reverse().map(h=>`<div><small>${h.d}</small>${esc(h.t)}</div>`).join('')}</div>`;
+  <div class="tl">${c.hist.slice().reverse().map(h=>`<div><small>${fd(h.d)}</small>${esc(h.t)}</div>`).join('')}</div>`;
 }
 function drawerLote(l){
   const c=cl(l.cid), cc=colchon(l);
@@ -674,7 +679,7 @@ function updSim(){
   $('#sdelta').textContent=(delta>=0?'+':'−')+money(Math.abs(delta)).replace('$','$ ')+' vs. base · total lote '+short(m*l.cab);
 }
 /* ---------- diálogos ---------- */
-function dlg(html,onSubmit){const d=$('#dlg');d.innerHTML=html;d.querySelector('form').onsubmit=e=>{e.preventDefault();onSubmit(Object.fromEntries(new FormData(e.target)));d.close()};
+function dlg(html,onSubmit){const d=$('#dlg');d.innerHTML=html;d.querySelector('form').onsubmit=e=>{e.preventDefault();onSubmit(Object.fromEntries([...new FormData(e.target)].map(([k,v])=>[k,/^\d{4}\/\d{2}(\/\d{2})?$/.test(v)?v.replace(/\//g,'-'):v])));d.close()};
   d.querySelector('[data-close]').onclick=()=>d.close();d.showModal()}
 const TEAMSEL=sel=>Object.keys(TEAM).map(t=>`<option ${t===sel?'selected':''}>${t}</option>`).join('');
 function newClient(){
@@ -698,8 +703,8 @@ function editLote(id){
   <label><span class="label">Sistema / etiqueta</span><input class="inp" name="sis" value="${esc(v('sis'))}"></label>
   <div class="r2"><label><span class="label">Origen</span><select name="orig"><option ${v('orig')==='Compra'?'selected':''}>Compra</option><option ${v('orig')==='Propios'?'selected':''}>Propios</option></select></label>
   ${n('cab','Cabezas',100)}${n('pi','Peso de ingreso (kg)',180)}${n('san','Sanidad ingreso ($/cab)',3000)}
-  <label><span class="label">Mes de ingreso</span><input class="inp" type="month" name="ing" value="${v('ing',iso(30).slice(0,7))}" required></label>
-  <label><span class="label">Mes de venta</span><input class="inp" type="month" name="ven" value="${v('ven',iso(240).slice(0,7))}" required></label></div>
+  <label><span class="label">Mes de ingreso</span>${campoFecha('ing',v('ing',iso(30).slice(0,7)),1)}</label>
+  <label><span class="label">Mes de venta</span>${campoFecha('ven',v('ven',iso(240).slice(0,7)),1)}</label></div>
   <h2 style="font-size:16px">Etapas</h2>
   ${[0,1,2,3].map(i=>`<div class="r2"><label><span class="label">Etapa ${i+1} tipo</span><select name="t${i}">${bo(et[i]?et[i][0]:null)}</select></label>
   <label><span class="label">Peso final (kg)</span><input class="inp" type="number" name="w${i}" value="${et[i]?et[i][1]:''}"></label></div>`).join('')}
@@ -717,7 +722,7 @@ function editLote(id){
 }
 function closeLote(id){
   const l=id?lo(id):null,r=l&&l.real?l.real:{fi:l?l.ing+'-01':iso(-200),pi:l?l.pi:180,ci:l?l.cab:100,fe:l?l.ven+'-01':iso(0),pe:l?l.pf:400,ce:l?l.cab:100,pc:'',pv:'',cd:'',mod:l?l.id:1};
-  const n=(k,lab,type='number')=>`<label><span class="label">${lab}</span><input class="inp" type="${type}" step="any" name="${k}" value="${r[k]}" ${['cd'].includes(k)?'':'required'}></label>`;
+  const n=(k,lab,type='number')=>`<label><span class="label">${lab}</span>${type==='date'?campoFecha(k,r[k]):`<input class="inp" type="${type}" step="any" name="${k}" value="${r[k]}" ${['cd'].includes(k)?'':'required'}>`}</label>`;
   dlg(`<form style="max-height:78vh;overflow:auto;padding-right:6px"><h2>Lote cerrado: datos reales</h2><p class="label">Igual que la sección B de la hoja Real. El margen real no incluye costo financiero ni estructura.</p>
   ${l?'':`<label><span class="label">Productor</span><select name="cid">${S.clients.map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('')}</select></label><label><span class="label">Nombre del lote</span><input class="inp" name="nombre" required></label>`}
   <div class="r2">${n('fi','Fecha de ingreso','date')}${n('fe','Fecha de egreso','date')}${n('pi','Peso de ingreso (kg)')}${n('pe','Peso de egreso (kg)')}${n('ci','Cabezas ingresadas')}${n('ce','Cabezas egresadas')}
@@ -734,7 +739,7 @@ function closeLote(id){
 function newTask(cid){
   dlg(`<form><h2>Nueva tarea</h2><label><span class="label">Qué hay que hacer</span><input class="inp" name="txt" required></label>
   <label><span class="label">Productor</span><select name="cid"><option value="">— ninguno —</option>${S.clients.map(c=>`<option value="${c.id}" ${c.id==cid?'selected':''}>${esc(c.nombre)}</option>`).join('')}</select></label>
-  <label><span class="label">Fecha límite</span><input class="inp" type="date" name="due" value="${iso(1)}" required></label>
+  <label><span class="label">Fecha límite</span>${campoFecha('due',iso(1))}</label>
   <label><span class="label">Responsable</span><select name="resp">${TEAMSEL(ME)}</select></label>
   <div class="bar"><button type="button" class="btn" data-close>Cancelar</button><button class="btn pri">Crear</button></div></form>`,f=>{
     S.tasks.push({id:S.nextTask++,txt:f.txt,cid:f.cid?+f.cid:null,due:f.due,done:false,resp:f.resp});render()});
@@ -742,7 +747,7 @@ function newTask(cid){
 function newPrecio(){
   const M=mk(),l=M[M.length-1],nm=(()=>{const d=new Date(l.f+'-01T00:00');d.setMonth(d.getMonth()+1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')})();
   const n=(k,lab)=>`<label><span class="label">${lab}</span><input class="inp" type="number" step="any" name="${k}" value="${l[k]}" required></label>`;
-  dlg(`<form><h2>Cargar precios del mes</h2><label><span class="label">Mes</span><input class="inp" type="month" name="f" value="${nm}" required></label>
+  dlg(`<form><h2>Cargar precios del mes</h2><label><span class="label">Mes</span>${campoFecha('f',nm,1)}</label>
   <div class="r2">${n('gor','Gordo ($/kg vivo)')}${n('inv','Invernada ($/kg vivo)')}${n('maiz','Maíz ($/tn)')}${n('soja','Soja ($/tn)')}${n('gas','Gasoil ($/litro)')}${n('usd','Dólar ($/USD)')}</div>
   <label><span class="label">Fuente / nota</span><input class="inp" name="nota"></label>
   <div class="bar"><button type="button" class="btn" data-close>Cancelar</button><button class="btn pri">Guardar</button></div></form>`,f=>{
@@ -871,7 +876,7 @@ function vHoy(){
     <div class="tasks">${S.tasks.filter(t=>!t.done).sort((a,b)=>a.due>b.due?1:-1).slice(0,7).map(taskRow).join('')||'<div class="empty">Sin tareas.</div>'}
       <button class="btn sm" style="margin:8px 12px" data-act="newTask">${ico('plus',14,2.5)} Nueva tarea</button></div>
     <h2 style="margin-top:22px">Movimientos</h2>
-    <div class="tasks">${S.log.slice(0,4).map(l=>`<div class="task"><div class="tx">${esc(l.x)}<small>${hhmm(l.t)}</small></div></div>`).join('')}</div>
+    <div class="tasks">${S.log.slice(0,4).map(l=>`<div class="task"><div class="tx">${esc(l.x)}<small>${fdt(l.t)} ${hhmm(l.t)}</small></div></div>`).join('')}</div>
   </div></div>`;
 }
 function bindDeck(){
@@ -940,7 +945,7 @@ function vAnalisis(){
   ${UI.atab==='cal'?tCal():UI.atab==='sens'?tSens():UI.atab==='comp'?tComp():tCurva()}`;
 }
 function tCal(){
-  const C=S.cal,lab=C.meses.map(m=>ym(m+'-01').slice(0,3)),bal=forrajeBal();
+  const C=S.cal,lab=C.meses.map(m=>mn3(m+'-01')),bal=forrajeBal();
   return `<p class="note">Suma de todos los lotes del modelo (lotes 1 a 6), mes a mes. Los datos vienen de tu hoja Calendario.</p>
   <div class="cols"><div><h2>Cabezas en pasto y en corral</h2><div class="legend"><span><i style="background:#15b374"></i>En pasto</span><span><i style="background:#f0452b"></i>En corral</span></div>
   ${lineSVG(lab,[{n:'En pasto',c:'#15b374',v:C.pasto},{n:'En corral',c:'#f0452b',v:C.corral}],v=>Math.round(v))}</div>
