@@ -162,7 +162,7 @@ textarea:focus,.inp:focus{box-shadow:0 0 0 2px var(--ink)}
 .m small{color:var(--mut);font-weight:600;font-size:11px;margin:0 8px}
 .chipref{display:inline-block;margin-top:6px;background:var(--ink);color:#fff;border-radius:99px;padding:2px 12px;font-size:12px;font-weight:700;border:0}
 .cin{display:flex;gap:8px;padding:12px}
-.cin input{flex:1;border:0;background:var(--bg);border-radius:99px;padding:11px 18px;outline:none}
+.cin input{min-width:0;flex:1;border:0;background:var(--bg);border-radius:99px;padding:11px 18px;outline:none}
 .typ{height:18px;padding:0 20px;font-size:12px;color:var(--mut);font-weight:600}
 /* toast + dialog */
 #toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;display:flex;flex-direction:column;gap:10px;z-index:60;align-items:center}
@@ -247,6 +247,13 @@ textarea.inp{min-height:60px;margin-top:6px}
 .login form{background:#fff;border-radius:30px;box-shadow:0 30px 80px rgba(18,22,31,.2);padding:30px;width:min(420px,100%)}
 .login label{display:block;margin-bottom:12px;font-weight:700;font-size:13px}.login label .inp{margin-top:4px;font-weight:500}
 .lmsg{min-height:22px;font-size:13px;font-weight:600;color:var(--red);margin-bottom:8px}.lmsg.ok{color:var(--green)}
+/* pantallas que cuadran: los textos largos y los botones se acomodan, nada sale de la ventana */
+.bar label{display:flex;flex-wrap:wrap;align-items:center;gap:6px;max-width:100%;min-width:0}
+.bar select{max-width:100%;min-width:0}
+.list li{flex-wrap:wrap}.list li .tx{flex:1 1 180px;min-width:0;overflow-wrap:anywhere}
+dialog input,dialog select,dialog textarea{min-width:0;max-width:100%}dialog .r2>label{min-width:0}
+.cin select{max-width:96px}
+@media(max-width:480px){dialog .r2{grid-template-columns:1fr}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js" defer></script>
 </head>
@@ -402,7 +409,7 @@ const gdpvEf=(b,m,w)=>{const g=b.g[m];return g<=0?0:Math.max(g+b.dg*(w-b.pref)/1
 function forrajeBal(){const r=S.rec[0];return S.fdem.map(([f,d])=>{const m=+f.slice(5,7)-1;return [f,r.ha*r.rend*(r.perfil[m]/100)*r.efic-d]})}
 function haReq(){const r=S.rec[0];let mx=0;S.fdem.forEach(([f,d])=>{const m=+f.slice(5,7)-1,k=r.rend*(r.perfil[m]/100)*r.efic;if(d>0&&k>0)mx=Math.max(mx,d/k)});return mx}
 function setPath(p,v){const k=p.split('.');let o=S;for(let i=0;i<k.length-1;i++)o=o[k[i]];o[k[k.length-1]]=v}
-const gi=(p,v,o={})=>o.s?`<input class="inp" style="width:${o.w||170}px" data-act="cset" data-p="${p}" data-s="1" value="${esc(v)}">`:`<input class="inp num" style="width:${o.w||78}px" type="number" step="any" data-act="cset" data-p="${p}" ${o.pc?'data-pc="1"':''} value="${o.pc?+(v*100).toFixed(2):v}">`;
+const gi=(p,v,o={})=>o.s?`<input class="inp" style="width:${Math.max(o.w||170,Math.min(Math.round(String(v).length*8.4+32),480))}px" data-act="cset" data-p="${p}" data-s="1" value="${esc(v)}">`:`<input class="inp num" style="width:${o.w||78}px" type="number" step="any" data-act="cset" data-p="${p}" ${o.pc?'data-pc="1"':''} value="${o.pc?+(v*100).toFixed(2):v}">`;
 function realDevs(){ // último mes medido por tipo de etapa vs. Biblioteca
   return BIB.map(b=>{const o=S.real[b.id]||{},ks=Object.keys(o).filter(k=>o[k]!==''&&o[k]!=null).map(Number);if(!ks.length)return null;
     const m=Math.max(...ks),v=+o[m],g=b.g[m];return g>0?{b,m,v,g,dev:v/g-1}:null}).filter(Boolean);}
@@ -530,7 +537,7 @@ function tBib(){
   <td><select data-act="bsrc" data-i="${i}">${srcOpts(b)}</select></td>
   <td class="num">${b.src?dec(bibBase(b)):gi(`bib.${i}.costo`,b.costo)}</td><td class="num">${gi(`bib.${i}.merma`,b.merma,{pc:1,w:60})}</td><td class="num"><b>${dec(bibEf(b))}</b></td>
   <td class="num">${gi(`bib.${i}.cons`,b.cons,{pc:1,w:60})}</td><td class="num">${gi(`bib.${i}.mo`,b.mo,{w:70})}</td><td class="num">${gi(`bib.${i}.otros`,b.otros,{w:70})}</td>
-  <td class="num">${gi(`bib.${i}.mort`,b.mort,{pc:1,w:60})}</td><td class="num">${gi(`bib.${i}.ingreso`,b.ingreso,{w:80})}</td><td class="num">${gi(`bib.${i}.dg`,b.dg,{w:64})}</td><td class="num">${gi(`bib.${i}.pref`,b.pref,{w:64})}</td><td class="num">${gi(`bib.${i}.gmin`,b.gmin,{w:60})}</td></tr>`).join('')}</tbody></table></div>
+  <td class="num">${gi(`bib.${i}.mort`,b.mort,{pc:1,w:60})}</td><td class="num">${gi(`bib.${i}.ingreso`,b.ingreso,{w:80})}</td><td class="num">${gi(`bib.${i}.dg`,b.dg,{w:80})}</td><td class="num">${gi(`bib.${i}.pref`,b.pref,{w:64})}</td><td class="num">${gi(`bib.${i}.gmin`,b.gmin,{w:60})}</td></tr>`).join('')}</tbody></table></div>
   <div class="sec"><h2>GDPV por mes (kg/día)</h2><div class="tablewrap"><table class="cc"><thead><tr><th>Etapa</th>${MES.map(m=>`<th class="num">${m}</th>`).join('')}</tr></thead><tbody>
   ${S.bib.filter(b=>!b.libre).map(b=>{const i=S.bib.indexOf(b);return `<tr><td>${esc(b.n)}</td>${MES.map((_,m)=>`<td class="num" style="padding:4px">${gi(`bib.${i}.g.${m}`,b.g[m],{w:66})}</td>`).join('')}</tr>`}).join('')}</tbody></table></div></div>
   <div class="sec"><h2>¿Cuánto cuesta ganar un kilo?</h2><p class="sub" style="margin:0 0 10px">Costo diario = consumo × costo efectivo + costos fijos, dividido por el GDPV del mes (ajustado por peso). Se compara con el gordo de hoy (${money(lastMk().gor)}/kg).</p>
@@ -687,7 +694,7 @@ function editLote(id){
   dlg(`<form style="max-height:78vh;overflow:auto;padding-right:6px"><h2>${l?'Editar lote '+l.id:'Nuevo lote'}</h2>
   <p class="label">Mismas columnas que la hoja Lotes del Excel.</p>
   <label><span class="label">Productor</span><select name="cid">${S.clients.map(c=>`<option value="${c.id}" ${l&&l.cid===c.id?'selected':''}>${esc(c.nombre)}</option>`).join('')}</select></label>
-  <label><span class="label">Nombre</span><input class="inp" name="nombre" value="${esc(v('nombre'))}" required></label>
+  <label><span class="label">Nombre</span><textarea class="inp" name="nombre" rows="3" required style="resize:none">${esc(v('nombre'))}</textarea></label>
   <label><span class="label">Sistema / etiqueta</span><input class="inp" name="sis" value="${esc(v('sis'))}"></label>
   <div class="r2"><label><span class="label">Origen</span><select name="orig"><option ${v('orig')==='Compra'?'selected':''}>Compra</option><option ${v('orig')==='Propios'?'selected':''}>Propios</option></select></label>
   ${n('cab','Cabezas',100)}${n('pi','Peso de ingreso (kg)',180)}${n('san','Sanidad ingreso ($/cab)',3000)}
