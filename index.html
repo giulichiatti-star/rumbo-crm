@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="app-version" content="20261031-224740">
+<meta name="app-version" content="20261031-231139">
 <title>Rumbo · recría y engorde</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -257,14 +257,16 @@ dialog input,dialog select,dialog textarea{min-width:0;max-width:100%}dialog .r2
 @media(max-width:480px){dialog .r2{grid-template-columns:1fr}}
 .nueva{position:fixed;top:0;left:0;right:0;z-index:300;background:var(--ink);color:#fff;display:none;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap;padding:10px 16px;box-shadow:0 8px 24px rgba(18,22,31,.3)}
 .nueva.on{display:flex}.nueva div{display:flex;flex-direction:column;min-width:0;text-align:left}.nueva b{font-weight:800}.nueva span{font-size:13px;color:#cfd3dc}
-.nueva-dentro{background:var(--ink);color:#fff;border-radius:16px;padding:10px 14px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:13px}.nueva-dentro span{color:#cfd3dc;flex:1 1 160px}</style>
+.nueva-dentro{background:var(--ink);color:#fff;border-radius:16px;padding:10px 14px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:13px}.nueva-dentro span{color:#cfd3dc;flex:1 1 160px}.mini{font:800 14px Manrope,sans-serif;margin:18px 0 8px}button.avatar{border:0;cursor:pointer}
+.foot small{color:var(--mut)}
+</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js" defer></script>
 </head>
 <body>
 <header>
   <div class="logo"><i id="lg"></i>rumbo</div>
   <div class="cmd"><span class="si" id="si"></span><input id="q" placeholder="Buscá un productor o un lote, o escribí qué querés hacer…" autocomplete="off"><kbd>⌘K</kbd><div class="res" id="res"></div></div>
-  <div class="hr"><span class="sync" id="sync"></span><button class="bellb" id="bellb" aria-label="Pendientes"></button><div class="avatar" id="av"></div></div>
+  <div class="hr"><span class="sync" id="sync"></span><button class="bellb" id="bellb" aria-label="Pendientes"></button><button class="avatar" id="av" data-act="cuenta" aria-label="Mi cuenta y datos"></button></div>
 </header>
 <div class="modes"><div class="seg" id="seg"></div></div>
 <main id="main"></main>
@@ -277,6 +279,7 @@ dialog input,dialog select,dialog textarea{min-width:0;max-width:100%}dialog .r2
 <div id="lmsg" class="lmsg"></div><div style="display:flex;gap:8px"><button class="btn pri" id="lin" style="flex:1">Entrar</button><button type="button" class="btn" id="lup" style="flex:1">Crear cuenta</button></div></form></div>
 <div id="toasts"></div><dialog id="dlg"></dialog>
 <input type="file" id="file" accept=".csv" hidden>
+<input type="file" id="fileCopia" accept=".json,application/json" hidden>
 
 <script>
 const ICONS={
@@ -309,12 +312,19 @@ const pct=(x,d=1)=>(x*100).toFixed(d).replace('.',',').replace('-','−')+'%';
 const dec=(x,d=2)=>Number(x).toFixed(d).replace('.',',');
 const hhmm=t=>new Date(t).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
 const MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const ym=s=>s.slice(0,7).replace('-','/');           // mes: aaaa/mm
+// Fechas a la vista: dd/mm/aaaa (los meses, mm/aaaa). Por dentro se guardan como aaaa-mm-dd.
+const ym=s=>s.slice(5,7)+'/'+s.slice(0,4);              // mes: mm/aaaa
 const mn3=s=>MES[+s.slice(5,7)-1];                    // nombre corto del mes, solo para los ejes de los gráficos
-const fd=s=>String(s).replace(/-/g,'/');              // fecha: aaaa/mm/dd
-const fdt=t=>{const d=new Date(t);return d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0')};
-const PAT_FECHA='\\d{4}/(0[1-9]|1[0-2])/(0[1-9]|[12]\\d|3[01])',PAT_MES='\\d{4}/(0[1-9]|1[0-2])';
-const campoFecha=(name,val,mes)=>`<input class="inp" name="${name}" value="${fd(val)}" inputmode="numeric" placeholder="${mes?'aaaa/mm':'aaaa/mm/dd'}" pattern="${mes?PAT_MES:PAT_FECHA}" title="Escribí la fecha como ${mes?'aaaa/mm (ej. 2026/11)':'aaaa/mm/dd (ej. 2026/11/05)'}" required>`;
+const fd=s=>{const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?m[3]+'/'+m[2]+'/'+m[1]:String(s)};   // fecha: dd/mm/aaaa
+const fdm=s=>{const m=String(s).match(/^(\d{4})-(\d{2})$/);return m?m[2]+'/'+m[1]:String(s)};
+const fdt=t=>{const d=new Date(t);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear()};
+const PAT_FECHA='(0[1-9]|[12]\\d|3[01])/(0[1-9]|1[0-2])/\\d{4}',PAT_MES='(0[1-9]|1[0-2])/\\d{4}';
+function fechaExiste(txt,mes){const m=mes?txt.match(/^(\d{2})\/(\d{4})$/):txt.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);if(!m)return false;
+  const d=mes?1:+m[1],mo=mes?+m[1]:+m[2],y=mes?+m[2]:+m[3],f=new Date(y,mo-1,d);return f.getFullYear()===y&&f.getMonth()===mo-1&&f.getDate()===d}
+// Fecha completa: selector nativo (en el celular abre el calendario y se ve en el formato de cada aparato, dd/mm/aaaa en Argentina).
+// Mes: como Safari y Firefox de escritorio no tienen selector de mes, se escribe como texto mm/aaaa.
+const campoFecha=(name,val,mes)=>mes?`<input class="inp" name="${name}" value="${fdm(val)}" inputmode="numeric" placeholder="mm/aaaa" pattern="${PAT_MES}" data-mes="1" oninput="this.setCustomValidity(fechaExiste(this.value,1)?'':'Ese mes no existe')" title="Escribí el mes como mm/aaaa (ej. 11/2026)" required>`
+  :`<input class="inp" type="date" name="${name}" value="${val}" required>`;
 const slug=e=>e.replace(/\s/g,'-');
 const ETAPAS=['Prospecto','Diagnóstico','Propuesta','Cliente activo','Pausado'];
 const LSTATES=['Planificado','En pasto','En corral','Listo','Cerrado'];
@@ -390,8 +400,9 @@ function seed(){
 }
 let S; try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||!S.lotes||!S.real||!S.bib||!S.cal)S=seed();
-let SYNC={on:false,last:0,pending:false,busy:false,timer:null,user:null};
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(SYNC.on)queuePush()};
+let SYNC={on:false,last:0,lastIso:null,snap:'',conflicto:false,pending:false,busy:false,timer:null,user:null};
+// Se guarda en el aparato siempre; en el servidor solo si los datos realmente cambiaron (así abrir o mirar pantallas no genera choques).
+const save=()=>{const j=JSON.stringify(S);try{localStorage.setItem(KEY,j)}catch(e){}if(SYNC.on&&j!==SYNC.snap)queuePush()};
 const UI={ctab:'forraje',cc:{peso:300,mes:new Date().getMonth()},view:'panel',q:'',stage:'Todas',own:'Todos',sort:'nombre',dir:1,drawer:null,typing:null,serie:'gor',sim:{dg:0,dp:0}};
 const cl=id=>S.clients.find(c=>c.id===id), lo=id=>S.lotes.find(l=>l.id===id);
 const since=c=>c.ultimo==null?null:-diff(c.ultimo);
@@ -683,7 +694,7 @@ function updSim(){
   $('#sdelta').textContent=(delta>=0?'+':'−')+money(Math.abs(delta)).replace('$','$ ')+' vs. base · total lote '+short(m*l.cab);
 }
 /* ---------- diálogos ---------- */
-function dlg(html,onSubmit){const d=$('#dlg');d.innerHTML=html;d.querySelector('form').onsubmit=e=>{e.preventDefault();onSubmit(Object.fromEntries([...new FormData(e.target)].map(([k,v])=>[k,/^\d{4}\/\d{2}(\/\d{2})?$/.test(v)?v.replace(/\//g,'-'):v])));d.close()};
+function dlg(html,onSubmit){const d=$('#dlg');d.oncancel=null;d.innerHTML=html;d.querySelector('form').onsubmit=e=>{e.preventDefault();onSubmit(Object.fromEntries([...new FormData(e.target)].map(([k,v])=>[k,v.replace(/^(\d{2})\/(\d{2})\/(\d{4})$/,'$3-$2-$1').replace(/^(\d{2})\/(\d{4})$/,'$2-$1')])));d.close()};
   d.querySelector('[data-close]').onclick=()=>d.close();d.showModal();if(typeof avisoEnDialogo==='function')avisoEnDialogo()}
 const TEAMSEL=sel=>Object.keys(TEAM).map(t=>`<option ${t===sel?'selected':''}>${t}</option>`).join('');
 function newClient(){
@@ -845,7 +856,7 @@ function render(){
   const key=UI.view+(UI.view==='costos'?UI.ctab:'')+(UI.view==='ciclo'?UI.cview:'')+(UI.view==='analisis'?UI.atab:'');
   m.classList.toggle('fade',UI.shown!==key);UI.shown=key;
   const V={hoy:vHoy,ciclo:vCiclo,gente:vGente,mercado:vMercado,costos:vCostos,real:vReal,analisis:vAnalisis};
-  m.innerHTML=V[UI.view]()+`<div class="foot"><button data-act="reset">Borrar mis datos y empezar de nuevo</button>${SYNC.on?` · <button data-act="logout">Cerrar sesión (${esc(SYNC.user.email)})</button>`:''}</div>`;
+  m.innerHTML=V[UI.view]()+`<div class="foot"><button data-act="comentar">¿Algo no anda? Contanos</button> · <button data-act="cuenta">Mi cuenta y datos</button> · <small>Versión ${esc(versionApp())}</small></div>`;
   if(UI.view==='hoy')bindDeck();
   if(UI.view==='ciclo'){UI.cview==='tablero'?bindDnD():bindBars()}
   if(UI.drawer)renderDrawer();
@@ -1004,6 +1015,7 @@ function renderDrawer(){
 /* ---------- chat flotante ---------- */
 function chatR(){const C=S.chat,cur=C.chans.find(c=>c.id===C.ch);
   $('#chat').innerHTML=`<div class="ctabs">${C.chans.map(c=>`<button class="${c.id===C.ch?'on':''}" data-ch="${c.id}">${esc(c.n.replace('# ',''))}${C.unread[c.id]?`<b>${C.unread[c.id]}</b>`:''}</button>`).join('')}</div>
+  <div class="note" style="margin:4px 14px 0;font-size:12px">Por ahora el chat guarda tus mensajes en tu cuenta; todavía no llegan a otras personas.</div>
   <div id="msgs">${(C.msgs[C.ch]||[]).map(m=>{const l=m.lid&&lo(m.lid),c=m.cid&&cl(m.cid);return `<div class="m ${m.a===ME?'me':''}"><small>${m.a===ME?'Vos':esc(m.a)} · ${hhmm(m.t)}</small><div class="bub">${esc(m.x)}${l?`<br><button class="chipref" data-act="openLote" data-id="${l.id}">Lote ${l.id} · TIR ${pct(l.tir,0)}</button>`:''}${c?`<br><button class="chipref" data-act="open" data-id="${c.id}">${esc(c.nombre)}</button>`:''}</div></div>`}).join('')||'<div class="empty">Escribí el primer mensaje.</div>'}</div>
   <div class="typ">${UI.typing&&UI.typing.ch===C.ch?esc(UI.typing.who)+' está escribiendo…':''}</div>
   <form class="cin" id="cform"><select id="cref" style="max-width:110px"><option value="">Vincular…</option><optgroup label="Productores">${S.clients.map(c=>`<option value="c${c.id}">${esc(c.nombre)}</option>`).join('')}</optgroup><optgroup label="Lotes">${S.lotes.map(l=>`<option value="l${l.id}">Lote ${l.id}</option>`).join('')}</optgroup></select><input id="cmsg" placeholder="Mensaje…" autocomplete="off"><button class="btn pri" style="padding:10px 14px">${ico('send',18,2)}</button></form>`;
@@ -1078,6 +1090,9 @@ document.addEventListener('click',e=>{const t=e.target;
   if(a==='curvaDel'){if(S.curva.length>2)S.curva.splice(id,1);return render()}
   if(a==='contacted'){const c=cl(id);c.ultimo=iso(0);c.hist.push({d:iso(0),t:'Contacto registrado'});if(c.etapa==='Prospecto')c.etapa='Diagnóstico';log(`${ME} registró contacto con ${c.nombre}`);S.seen=[];toast('Contacto registrado','ok',c.nombre);return render()}
   if(a==='share'){const ref=b.dataset.id;S.chat.ch=ref[0]==='l'?'lotes':'general';closeDrawer();toggleChat(true);setTimeout(()=>{$('#cref').value=ref;$('#cmsg').value='Mírenlo cuando puedan: ';$('#cmsg').focus()},350);return}
+  if(a==='cuenta')return cuentaDialogo();
+  if(a==='comentar')return comentarDialogo();
+  if(a==='restaurar')return restaurarCopia(+b.dataset.id);
   if(a==='logout'){SYNC.on=false;try{localStorage.removeItem(KEY)}catch(e){}sb.auth.signOut().then(()=>location.reload());return}
   if(a==='reset'){if(confirm('¿Borrar todo lo que cargaste y volver a los datos del Excel?')){S=seed();S.resolved=0;UI.later=[];closeDrawer();render();chatR();toast('Datos restablecidos','info','Listo')}}
 });
@@ -1111,23 +1126,113 @@ render();chatR();
 const SUPA={url:'https://kyowmixxdoiohzmfvhpf.supabase.co',key:'sb_publishable_m5A6ucgIWhujD-uSGLMFjw_ChYJaM3t'};
 let sb=null;
 function syncStatus(t,c){const e=$('#sync');e.textContent=t;e.className='sync '+(c||'')}
+// Guardar: solo si el servidor sigue como lo dejamos la última vez (control de choques). Si cambió, no se pisa nada: se le pregunta a la persona.
 async function pushNow(){
-  if(!SYNC.on||SYNC.busy)return;SYNC.busy=true;SYNC.pending=false;syncStatus('Guardando…','wait');const now=new Date().toISOString();
-  const {error}=await sb.from('rumbo_state').upsert({user_id:SYNC.user.id,data:S,updated_at:now});SYNC.busy=false;
-  if(error){SYNC.pending=true;syncStatus('Sin conexión, reintento…','bad');setTimeout(pushNow,8000)}
-  else{SYNC.last=Date.parse(now);if(SYNC.pending)queuePush();else syncStatus('Sincronizado')}}
+  if(!SYNC.on||SYNC.busy||SYNC.conflicto)return;
+  SYNC.busy=true;SYNC.pending=false;syncStatus('Guardando…','wait');
+  const now=new Date().toISOString(),uid=SYNC.user.id,foto=JSON.stringify(S);let r;
+  if(SYNC.lastIso)r=await sb.from('rumbo_state').update({data:S,updated_at:now}).eq('user_id',uid).eq('updated_at',SYNC.lastIso).select('updated_at');
+  else r=await sb.from('rumbo_state').insert({user_id:uid,data:S,updated_at:now}).select('updated_at');
+  SYNC.busy=false;
+  if(r.error){
+    if(!SYNC.lastIso&&/duplicate|23505/i.test((r.error.message||'')+(r.error.code||'')))return hayConflicto();
+    SYNC.pending=true;syncStatus('Sin conexión, reintento…','bad');setTimeout(pushNow,8000);return}
+  if(!r.data||!r.data.length)return hayConflicto();
+  SYNC.lastIso=r.data[0].updated_at;SYNC.last=Date.parse(SYNC.lastIso);SYNC.snap=foto;
+  if(JSON.stringify(S)!==foto)queuePush();else syncStatus('Sincronizado')}
 function queuePush(){SYNC.pending=true;clearTimeout(SYNC.timer);SYNC.timer=setTimeout(pushNow,1200)}
+function aplicarRemoto(data){
+  S=data.data;SYNC.lastIso=data.updated_at;SYNC.last=Date.parse(data.updated_at);SYNC.snap=JSON.stringify(S);
+  try{localStorage.setItem(KEY,SYNC.snap)}catch(e){}render();chatR();syncStatus('Sincronizado')}
 async function pull(first){
-  if(!SYNC.on)return;const {data,error}=await sb.from('rumbo_state').select('data,updated_at').maybeSingle();
+  if(!SYNC.on||SYNC.conflicto)return;
+  const {data,error}=await sb.from('rumbo_state').select('data,updated_at').maybeSingle();
   if(error){syncStatus('Sin conexión','bad');return}
-  if(!data){await pushNow();return}
-  const rt=Date.parse(data.updated_at);
-  if(first||(rt>SYNC.last+500&&!SYNC.pending&&!SYNC.busy&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&!$('#dlg').open)){
-    S=data.data;SYNC.last=rt;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}render();chatR();if(!first)toast('Se actualizaron tus datos desde otro aparato','info','Sincronizado')}
-  syncStatus('Sincronizado')}
+  if(!data){SYNC.lastIso=null;await pushNow();return}
+  if(first){ // lo que hubiera en este aparato antes de entrar queda guardado aparte, por las dudas
+    try{localStorage.setItem('rumbo_previo_al_entrar',JSON.stringify({guardado:new Date().toISOString(),datos:S}))}catch(e){}
+    aplicarRemoto(data);return}
+  if(data.updated_at===SYNC.lastIso){syncStatus('Sincronizado');return}
+  if(SYNC.pending||SYNC.busy)return hayConflicto(data);                      // los dos lados cambiaron
+  if(/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)||$('#dlg').open)return;   // no pisar lo que se está escribiendo
+  aplicarRemoto(data);toast('Se actualizaron tus datos desde otro aparato','info','Sincronizado')}
+async function guardarCopia(motivo,datos){
+  if(!SYNC.on)return false;const {error}=await sb.from('rumbo_backups').insert({user_id:SYNC.user.id,motivo,data:datos});return !error}
+async function podarCopias(){
+  const r=await sb.from('rumbo_backups').select('id').order('created_at',{ascending:false}).range(14,500);
+  if(r.data&&r.data.length)await sb.from('rumbo_backups').delete().in('id',r.data.map(x=>x.id))}
+async function copiaDiaria(){
+  const r=await sb.from('rumbo_backups').select('created_at').order('created_at',{ascending:false}).limit(1);if(r.error)return;
+  const ult=r.data&&r.data[0]?Date.parse(r.data[0].created_at):0;
+  if(!ult||Date.now()-ult>20*3600e3)await guardarCopia('diaria',S);
+  await podarCopias()}
+// Choque: este aparato y otro cambiaron los datos a la vez. Se elige cuál queda; el otro se guarda igual como copia.
+async function hayConflicto(remoto){
+  SYNC.conflicto=true;clearTimeout(SYNC.timer);syncStatus('Hay cambios en otro aparato','bad');
+  if(!remoto){const r=await sb.from('rumbo_state').select('data,updated_at').maybeSingle();remoto=r.data}
+  if(!remoto){SYNC.conflicto=false;SYNC.lastIso=null;return pushNow()}
+  const espera=setInterval(()=>{if($('#dlg').open)return;clearInterval(espera);preguntarConflicto(remoto)},400)}
+function preguntarConflicto(remoto){
+  const d=$('#dlg');d.innerHTML=`<form><h2>Hay datos distintos en otro aparato</h2>
+  <p>Mientras cargabas acá, alguien cambió los datos desde otro celular o computadora (última vez: ${fdt(remoto.updated_at)} ${hhmm(Date.parse(remoto.updated_at))}). Elegí cuál querés conservar. Lo otro queda guardado como copia, así que no se pierde nada.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" id="cTraer">Traer lo del otro aparato</button><button type="button" class="btn pri" id="cQuedar">Conservar lo de este aparato</button></div></form>`;
+  d.oncancel=e=>e.preventDefault();
+  $('#cTraer').onclick=async()=>{await guardarCopia('choque: lo de este aparato',S);d.oncancel=null;d.close();SYNC.conflicto=false;aplicarRemoto(remoto);toast('Quedaron los datos del otro aparato. Lo de este quedó en «Copias en el servidor».','info','Listo')};
+  $('#cQuedar').onclick=async()=>{await guardarCopia('choque: lo del otro aparato',remoto.data);d.oncancel=null;d.close();SYNC.lastIso=remoto.updated_at;SYNC.conflicto=false;await pushNow();toast('Quedaron los datos de este aparato. Lo del otro quedó en «Copias en el servidor».','info','Listo')};
+  d.showModal()}
 async function afterLogin(session){
   SYNC.user=session.user;SYNC.on=true;$('#login').classList.remove('on');syncStatus('Conectando…','wait');await pull(true);
-  setInterval(()=>pull(false),15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pull(false)});render()}
+  setInterval(()=>pull(false),15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pull(false)});render();copiaDiaria()}
+/* ---------- Mi cuenta y datos, copias y comentarios (soporte) ---------- */
+function versionApp(){return (document.querySelector('meta[name="app-version"]')||{}).content||'local'}
+function cerrarSesion(){SYNC.on=false;try{localStorage.removeItem(KEY)}catch(e){}sb.auth.signOut().then(()=>location.reload())}
+function borrarTodo(){if(confirm('¿Borrar todo lo que cargaste y volver a los datos del Excel? Antes se guarda una copia en el servidor.')){
+  (async()=>{await guardarCopia('antes de borrar todo',S);S=seed();S.resolved=0;UI.later=[];closeDrawer();$('#dlg').close();render();chatR();toast('Datos restablecidos','info','Listo')})()}}
+function descargarCopia(){
+  const f=new Date(),n=x=>String(x).padStart(2,'0'),nombre=`rumbo-copia-${f.getFullYear()}${n(f.getMonth()+1)}${n(f.getDate())}-${n(f.getHours())}${n(f.getMinutes())}.json`;
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({app:'rumbo',version:versionApp(),exportado:f.toISOString(),datos:S},null,1)],{type:'application/json'}));a.download=nombre;a.click();toast('Se descargó '+nombre)}
+function datosValidos(o){return o&&typeof o==='object'&&Array.isArray(o.clients)&&Array.isArray(o.lotes)&&Array.isArray(o.tasks)&&o.chat&&Array.isArray(o.bib)&&o.rec&&o.mercado}
+async function usarDatos(datos,motivo,aviso){
+  await guardarCopia(motivo,S);S=datos;S.resolved=S.resolved||0;try{$('#dlg').close()}catch(e){}closeDrawer();render();chatR();save();toast(aviso,'ok','Listo')}
+async function listarCopias(){
+  const cont=$('#cLista');if(!cont)return;const r=await sb.from('rumbo_backups').select('id,created_at,motivo').order('created_at',{ascending:false});
+  if(r.error){cont.innerHTML='<div class="empty">No se pudieron traer las copias. Probá de nuevo en un rato.</div>';return}
+  cont.innerHTML=r.data.length?r.data.map(c=>`<li><div class="tx">${fdt(c.created_at)} ${hhmm(Date.parse(c.created_at))}<small>${esc(c.motivo||'')}</small></div><button type="button" class="btn sm" data-act="restaurar" data-id="${c.id}">Restaurar</button></li>`).join(''):'<div class="empty">Todavía no hay copias.</div>'}
+async function restaurarCopia(id){
+  const r=await sb.from('rumbo_backups').select('data,created_at').eq('id',id).maybeSingle();
+  if(r.error||!r.data||!datosValidos(r.data.data))return toast('No se pudo leer esa copia','warn','Atención');
+  if(confirm(`¿Restaurar la copia del ${fdt(r.data.created_at)} ${hhmm(Date.parse(r.data.created_at))}? Lo que tenés ahora se guarda antes como otra copia.`))
+    usarDatos(r.data.data,'antes de restaurar','Copia restaurada')}
+function cuentaDialogo(){
+  const d=$('#dlg');d.oncancel=null;
+  d.innerHTML=`<form style="max-height:78vh;overflow:auto;padding-right:6px"><h2>Mi cuenta y datos</h2>
+  <p class="sub" style="margin:0 0 6px">${SYNC.on?`Sesión de <b>${esc(SYNC.user.email)}</b>.`:'Estás usando la app sin cuenta: los datos quedan solo en este aparato.'} Versión ${esc(versionApp())}.</p>
+  <h3 class="mini">Mis datos</h3><div class="bar"><button type="button" class="btn" id="cDesc">Descargar una copia</button><button type="button" class="btn" id="cCarg">Cargar una copia</button></div>
+  ${SYNC.on?`<h3 class="mini">Copias guardadas en el servidor</h3><p class="sub" style="font-size:13px;margin:0 0 8px">Se guarda una por día (quedan las últimas 14) y otra cada vez que restaurás o resolvés un choque entre aparatos.</p>
+  <div class="bar"><button type="button" class="btn" id="cAhora">Guardar una copia ahora</button></div><ul id="cLista" class="list"><div class="empty">Buscando copias…</div></ul>`:''}
+  <h3 class="mini">Ayuda</h3><div class="bar"><button type="button" class="btn" id="cCom">Enviar un comentario</button><a class="btn" href="docs/guia-rapida.pdf" target="_blank" rel="noopener" style="text-decoration:none">Guía rápida (PDF)</a>${SYNC.on?'<button type="button" class="btn" id="cOut">Cerrar sesión</button>':''}</div>
+  <h3 class="mini">Empezar de nuevo</h3><div class="bar"><button type="button" class="btn" id="cBorrar" style="color:var(--red)">Borrar mis datos</button></div>
+  <div class="bar" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn" data-close>Cerrar</button></div></form>`;
+  d.querySelector('[data-close]').onclick=()=>d.close();
+  $('#cDesc').onclick=descargarCopia;$('#cCarg').onclick=()=>$('#fileCopia').click();
+  $('#cCom').onclick=()=>{d.close();comentarDialogo()};$('#cBorrar').onclick=borrarTodo;
+  if(SYNC.on){$('#cOut').onclick=cerrarSesion;$('#cAhora').onclick=async()=>{const ok=await guardarCopia('manual',S);toast(ok?'Copia guardada':'No se pudo guardar la copia',ok?'ok':'warn');await podarCopias();listarCopias()};listarCopias()}
+  d.showModal()}
+document.getElementById('fileCopia').onchange=e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;const r=new FileReader();
+  r.onload=()=>{let o;try{o=JSON.parse(r.result)}catch(x){return toast('El archivo no se puede leer','warn','Atención')}
+    if(o.app!=='rumbo'||!datosValidos(o.datos))return toast('Ese archivo no es una copia de Rumbo','warn','Atención');
+    if(confirm('¿Cargar esta copia? Lo que tenés ahora se guarda antes como otra copia en el servidor.'))usarDatos(o.datos,'antes de cargar un archivo','Copia cargada')};
+  r.readAsText(f)};
+function comentarDialogo(){
+  dlg(`<form><h2>Contanos cómo te va</h2><p class="sub" style="margin:0 0 12px">Algo que no funciona, una idea o una duda. Llega directo a quienes hicimos la app.</p>
+  <label>Qué es<select name="tipo"><option>Algo no funciona</option><option>Una idea para mejorar</option><option>Una duda</option></select></label>
+  <label>Contanos<textarea class="inp" name="texto" rows="5" required placeholder="Qué estabas haciendo y qué pasó"></textarea></label>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" data-close>Cancelar</button><button class="btn pri">Enviar</button></div></form>`,async f=>{
+    if(!SYNC.on)return toast('Para enviar comentarios hay que entrar con tu cuenta.','warn','Atención');
+    const pantalla=UI.view+(UI.view==='costos'?'/'+UI.ctab:UI.view==='analisis'?'/'+UI.atab:UI.view==='ciclo'?'/'+UI.cview:'');
+    const {error}=await sb.from('rumbo_feedback').insert({user_id:SYNC.user.id,email:SYNC.user.email,tipo:f.tipo,texto:f.texto,pantalla,version:versionApp(),ancho:innerWidth,aparato:navigator.userAgent.slice(0,160)});
+    toast(error?'No se pudo enviar. Probá de nuevo en un rato.':'¡Gracias! Lo vamos a revisar.',error?'warn':'ok')})}
 function startSync(){
   if(!SUPA.url||!SUPA.key||!window.supabase)return;
   sb=window.supabase.createClient(SUPA.url,SUPA.key);$('#lg2').innerHTML=ico('cow',22,2.2);

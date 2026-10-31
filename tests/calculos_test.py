@@ -206,7 +206,7 @@ def main():
             for ch in valor:
                 c.press_sequentially(ch)
             comparar(f"Tecleo {nombre}: el campo muestra todo lo escrito", c.input_value(), valor)
-        pag.locator("dialog input[name=f]").fill("2027/01")
+        pag.locator("dialog input[name=f]").fill("01/2027")
         pag.click("dialog button.pri")
         # A mano: invernada/gordo = 6250/4310,5 = 1,4499478;  kg de maíz por kg de gordo = 4310,5×1000/1234567 = 3,4915075
         comparar("Precios del mes: invernada/gordo", ev("derived(lastMk()).ratio"), 1.4499478, 1e-6)

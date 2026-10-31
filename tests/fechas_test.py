@@ -1,9 +1,9 @@
-"""Prueba del formato de fechas: todas las fechas se muestran y se escriben como aaaa/mm/dd.
+"""Prueba del formato de fechas: todas las fechas se muestran y se escriben como dd/mm/aaaa (los meses, mm/aaaa).
 
 1. Recorre todas las pantallas, paneles y formularios y busca fechas escritas de otra forma
-   (2026-10-30, 30/10/2026, «Oct 26»).
+   (2026-10-30, 2026/10/30, «Oct 26»).
 2. Escribe una fecha en un formulario TECLEANDO carácter por carácter y comprueba que se guarda
-   la fecha exacta (resultado === esperado); una fecha con otro formato debe ser rechazada.
+   la fecha exacta (resultado === esperado); una fecha con otro formato, o que no existe (31/02/2026), debe ser rechazada.
 
 Uso:   python3 tests/fechas_test.py [ruta/a/index.html]
 Salida: 0 = todo bien, 1 = hay fallas.
@@ -20,7 +20,7 @@ import pantallas_cuadran_test as base  # noqa: E402
 URL = pathlib.Path(sys.argv[1]).resolve().as_uri() if len(sys.argv) > 1 else base.URL
 PROHIBIDO = [
     (re.compile(r"\b\d{4}-\d{2}-\d{2}\b"), "fecha con guiones (aaaa-mm-dd)"),
-    (re.compile(r"\b\d{1,2}/\d{1,2}/\d{4}\b"), "fecha dd/mm/aaaa"),
+    (re.compile(r"\b\d{4}/\d{1,2}/\d{1,2}\b"), "fecha aaaa/mm/dd"),
     (re.compile(r"\b(Ene|Feb|Mar|Abr|May|Jun|Jul|Ago|Sep|Oct|Nov|Dic) \d{2}\b"), "mes escrito como «Oct 26»"),
 ]
 SEMBRAR = """() => {
@@ -48,7 +48,7 @@ def main():
             pag.wait_for_timeout(550 if nombre.startswith(("Panel", "Chat")) else 150)
             texto = pag.evaluate("""() => {
               const raiz = document.querySelector('dialog[open]') || document.body;
-              const campos = [...raiz.querySelectorAll('input,textarea')].map(i => i.value + ' ' + (i.placeholder || '')).join(' | ');
+              const campos = [...raiz.querySelectorAll('input:not([type=date]),textarea')].map(i => i.value + ' ' + (i.placeholder || '')).join(' | ');
               return raiz.innerText + ' | ' + campos;
             }""")
             revisadas += 1
@@ -61,46 +61,47 @@ def main():
         pag.evaluate("() => {UI.view='gente';render();openDrawer('c',1)}")
         pag.wait_for_timeout(550)
         ficha = pag.inner_text("#dr")
-        for esperado in ("2026/10/29", "2026/10/30"):
+        for esperado in ("29/10/2026", "30/10/2026"):
             if esperado not in ficha:
                 fallas.append(f"Ficha del productor: no aparece la fecha «{esperado}»")
         pag.evaluate("() => {" + base.CIERRA + "}")
 
         try:
-          # 3) Tecleo real en el formulario de tarea
+          # 3) Fecha completa: selector nativo del aparato (calendario en el celular). Lo guardado es la fecha exacta.
           pag.evaluate("() => {UI.view='hoy';render();newTask()}")
           pag.fill("dialog input[name=txt]", "Tarea con fecha")
-          campo = pag.locator("dialog input[name=due]")
+          if pag.get_attribute("dialog input[name=due]", "type") != "date":
+              fallas.append("La fecha límite de la tarea no usa el selector de fecha del aparato")
+          pag.fill("dialog input[name=due]", "2026-11-05")
+          pag.click("dialog button.pri")
+          due = pag.evaluate("() => S.tasks.filter(t => t.txt === 'Tarea con fecha').map(t => t.due)")
+          if due != ["2026-11-05"]:
+              fallas.append(f"La fecha elegida 5/11/2026 se guardó como {due}, se esperaba ['2026-11-05']")
+
+          # 4) Mes escrito a mano en el formulario de lote: mm/aaaa, tecleando carácter por carácter
+          pag.evaluate("() => {UI.view='ciclo';render();editLote(1)}")
+          campo = pag.locator("dialog input[name=ing]")
           campo.fill("")
           esperado_valor = ""
-          for ch in "2026/11/05":                       # carácter por carácter, como una persona
+          for ch in "11/2027":
               campo.press_sequentially(ch)
               esperado_valor += ch
               if campo.input_value() != esperado_valor:
                   fallas.append(f"Tecleo: tras «{esperado_valor}» el campo muestra «{campo.input_value()}»")
           if not pag.evaluate("() => document.querySelector('dialog form').checkValidity()"):
-              fallas.append("Una fecha válida (2026/11/05) fue rechazada por el formulario")
+              fallas.append("Un mes válido (11/2027) fue rechazado por el formulario")
           pag.click("dialog button.pri")
-          due = pag.evaluate("() => S.tasks.filter(t => t.txt === 'Tarea con fecha').map(t => t.due)")
-          if due != ["2026-11-05"]:
-              fallas.append(f"La fecha tecleada 2026/11/05 se guardó como {due}, se esperaba ['2026-11-05']")
-
-          # 4) Un formato distinto se rechaza
-          pag.evaluate("() => {UI.view='hoy';render();newTask()}")
-          pag.fill("dialog input[name=txt]", "Otra")
-          for malo in ("05/11/2026", "2026-11-05", "2026/13/01", "2026/11/32", "mañana"):
-              pag.fill("dialog input[name=due]", malo)
-              if pag.evaluate("() => document.querySelector('dialog form').checkValidity()"):
-                  fallas.append(f"El formulario aceptó una fecha mal escrita: «{malo}»")
+          if pag.evaluate("() => lo(1).ing") != "2027-11":
+              fallas.append(f"El mes tecleado 11/2027 se guardó como {pag.evaluate('() => lo(1).ing')}, se esperaba '2027-11'")
 
           # 5) Meses del formulario de precios: aaaa/mm
           pag.evaluate("() => {document.getElementById('dlg').close();UI.view='mercado';render();newPrecio()}")
-          for bueno, ok in (("2026/11", True), ("2026-11", False), ("11/2026", False)):
+          for bueno, ok in (("11/2026", True), ("2026/11", False), ("2026-11", False), ("13/2026", False), ("00/2026", False)):
               pag.fill("dialog input[name=f]", bueno)
               if pag.evaluate("() => document.querySelector('dialog form').checkValidity()") != ok:
                   fallas.append(f"Mes «{bueno}»: se esperaba {'aceptar' if ok else 'rechazar'}")
-        except Exception as e:  # el formulario no admite escribir la fecha como aaaa/mm/dd
-            fallas.append('Los formularios de fecha no aceptan escribir aaaa/mm/dd (' + str(e).splitlines()[0][:70] + ')')
+        except Exception as e:  # el formulario no admite escribir la fecha como dd/mm/aaaa
+            fallas.append('Los formularios de fecha no aceptan escribir dd/mm/aaaa (' + str(e).splitlines()[0][:70] + ')')
         ctx.close()
         nav.close()
 
@@ -110,7 +111,7 @@ def main():
         for f in dict.fromkeys(fallas):
             print("  -", f)
         sys.exit(1)
-    print("TODAS LAS FECHAS EN aaaa/mm/dd.")
+    print("TODAS LAS FECHAS EN dd/mm/aaaa.")
 
 
 if __name__ == "__main__":

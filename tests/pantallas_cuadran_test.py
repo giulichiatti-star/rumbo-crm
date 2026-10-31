@@ -63,6 +63,10 @@ MEDIR = """async (nombre) => {
   return fallas;
 }"""
 
+# Simula una sesión iniciada (con un correo largo) y 14 copias en el servidor, sin conectarse a nada.
+CON_CUENTA = ("SYNC.on=true;SYNC.user={email:'productor.con.un.correo.bastante.largo@ejemplo.com.ar'};"
+              "sb={from:()=>({select:()=>({order:()=>Promise.resolve({data:Array.from({length:14},(_,i)=>({id:i,created_at:new Date().toISOString(),motivo:'choque: lo del otro aparato'})),error:null})})})}")
+
 PANTALLAS = [  # (nombre, preparación en la página, limpieza)
     ("Hoy", "UI.view='hoy';render()"),
     ("Ciclo · línea de tiempo", "UI.view='ciclo';UI.cview='tiempo';render()"),
@@ -86,10 +90,14 @@ PANTALLAS = [  # (nombre, preparación en la página, limpieza)
     ("Formulario · lote cerrado", "UI.view='real';render();closeLote()"),
     ("Formulario · precios del mes", "UI.view='mercado';render();newPrecio()"),
     ("Chat", "UI.view='hoy';render();toggleChat(true)"),
+    ("Formulario · mi cuenta y datos", "UI.view='hoy';render();" + CON_CUENTA + ";cuentaDialogo()"),
+    ("Formulario · mi cuenta (sin cuenta)", "UI.view='hoy';render();cuentaDialogo()"),
+    ("Formulario · comentario", "UI.view='hoy';render();comentarDialogo()"),
+    ("Formulario · choque de datos", "UI.view='hoy';render();preguntarConflicto({updated_at:new Date().toISOString(),data:{}})"),
     ("Aviso de versión nueva", "UI.view='hoy';render();mostrarAvisoVersion()"),
     ("Aviso de versión nueva dentro de un formulario", "UI.view='hoy';render();newTask();mostrarAvisoVersion()"),
 ]
-CIERRA = "(()=>{const d=document.getElementById('dlg');if(d.open)d.close();closeDrawer();toggleChat(false);document.getElementById('nueva').classList.remove('on');document.body.style.paddingTop=''})()"
+CIERRA = "(()=>{const d=document.getElementById('dlg');if(d.open)d.close();closeDrawer();toggleChat(false);SYNC.on=false;document.getElementById('nueva').classList.remove('on');document.body.style.paddingTop=''})()"
 
 
 def main():
