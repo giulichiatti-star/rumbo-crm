@@ -47,7 +47,10 @@ MEDIR = """async (nombre) => {
   const marco = raiz === document.body ? null : raiz.getBoundingClientRect();
   if (marco && (marco.left < -1 || marco.right > W + 1 || marco.top < -1 || marco.bottom > H + 1))
     fallas.push('el cuadro se sale de la ventana: ' + [marco.left, marco.top, marco.right, marco.bottom].map(Math.round).join(','));
-  const lista = raiz === document.body ? '#main button,#main input,#main select,#seg button,header input,header button,header .bellb' : 'button,input,select,textarea';
+  const av = document.getElementById('nueva'), cab = document.querySelector('header');
+  if (av && av.classList.contains('on') && cab && cab.getBoundingClientRect().top < av.getBoundingClientRect().bottom - 1)
+    fallas.push('el aviso de versión nueva tapa la cabecera de la página');
+  const lista = raiz === document.body ? '#main button,#main input,#main select,#seg button,header input,header button,header .bellb,#nueva button' : 'button,input,select,textarea';
   raiz.querySelectorAll(lista).forEach(e => {
     if (e.closest(CON_SCROLL) && raiz === document.body) return;
     const r = e.getBoundingClientRect(); if (!r.width || !r.height) return;
@@ -83,8 +86,10 @@ PANTALLAS = [  # (nombre, preparación en la página, limpieza)
     ("Formulario · lote cerrado", "UI.view='real';render();closeLote()"),
     ("Formulario · precios del mes", "UI.view='mercado';render();newPrecio()"),
     ("Chat", "UI.view='hoy';render();toggleChat(true)"),
+    ("Aviso de versión nueva", "UI.view='hoy';render();mostrarAvisoVersion()"),
+    ("Aviso de versión nueva dentro de un formulario", "UI.view='hoy';render();newTask();mostrarAvisoVersion()"),
 ]
-CIERRA = "(()=>{const d=document.getElementById('dlg');if(d.open)d.close();closeDrawer();toggleChat(false)})()"
+CIERRA = "(()=>{const d=document.getElementById('dlg');if(d.open)d.close();closeDrawer();toggleChat(false);document.getElementById('nueva').classList.remove('on');document.body.style.paddingTop=''})()"
 
 
 def main():

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="app-version" content="20261031-224740">
 <title>Rumbo · recría y engorde</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -254,7 +255,9 @@ textarea.inp{min-height:60px;margin-top:6px}
 dialog input,dialog select,dialog textarea{min-width:0;max-width:100%}dialog .r2>label{min-width:0}
 .cin select{max-width:96px}
 @media(max-width:480px){dialog .r2{grid-template-columns:1fr}}
-</style>
+.nueva{position:fixed;top:0;left:0;right:0;z-index:300;background:var(--ink);color:#fff;display:none;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap;padding:10px 16px;box-shadow:0 8px 24px rgba(18,22,31,.3)}
+.nueva.on{display:flex}.nueva div{display:flex;flex-direction:column;min-width:0;text-align:left}.nueva b{font-weight:800}.nueva span{font-size:13px;color:#cfd3dc}
+.nueva-dentro{background:var(--ink);color:#fff;border-radius:16px;padding:10px 14px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:13px}.nueva-dentro span{color:#cfd3dc;flex:1 1 160px}</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js" defer></script>
 </head>
 <body>
@@ -268,6 +271,7 @@ dialog input,dialog select,dialog textarea{min-width:0;max-width:100%}dialog .r2
 <div class="ov" id="ov"></div><aside class="dr" id="dr"></aside>
 <button class="fab" id="fab" aria-label="Chat del equipo"></button>
 <section class="chat" id="chat"></section>
+<div id="nueva" class="nueva" role="alert"><div><b>Hay una versión nueva de Rumbo.</b><span>Terminá lo que estás cargando y tocá Actualizar. Tus datos y tu sesión se mantienen.</span></div><button class="btn lime" id="nbtn" type="button">Actualizar</button></div>
 <div id="login" class="login"><form id="lform"><div class="logo" style="margin-bottom:6px"><i id="lg2"></i>rumbo</div><p class="sub" style="margin:0 0 16px">Entrá con tu correo para guardar tus datos y verlos desde el celular y la computadora.</p>
 <label>Correo<input class="inp" type="email" id="lmail" autocomplete="username" required></label><label>Contraseña (mínimo 6 caracteres)<input class="inp" type="password" id="lpass" autocomplete="current-password" minlength="6" required></label>
 <div id="lmsg" class="lmsg"></div><div style="display:flex;gap:8px"><button class="btn pri" id="lin" style="flex:1">Entrar</button><button type="button" class="btn" id="lup" style="flex:1">Crear cuenta</button></div></form></div>
@@ -680,7 +684,7 @@ function updSim(){
 }
 /* ---------- diálogos ---------- */
 function dlg(html,onSubmit){const d=$('#dlg');d.innerHTML=html;d.querySelector('form').onsubmit=e=>{e.preventDefault();onSubmit(Object.fromEntries([...new FormData(e.target)].map(([k,v])=>[k,/^\d{4}\/\d{2}(\/\d{2})?$/.test(v)?v.replace(/\//g,'-'):v])));d.close()};
-  d.querySelector('[data-close]').onclick=()=>d.close();d.showModal()}
+  d.querySelector('[data-close]').onclick=()=>d.close();d.showModal();if(typeof avisoEnDialogo==='function')avisoEnDialogo()}
 const TEAMSEL=sel=>Object.keys(TEAM).map(t=>`<option ${t===sel?'selected':''}>${t}</option>`).join('');
 function newClient(){
   dlg(`<form><h2>Nuevo productor</h2>
@@ -1136,6 +1140,28 @@ function startSync(){
     if(error)msg(ES[error.message]||error.message);else if(data.session)afterLogin(data.session);else msg('Te mandamos un correo para confirmar la cuenta. Confirmá y volvé a entrar.',true)};
   sb.auth.getSession().then(({data})=>{if(data.session)afterLogin(data.session);else $('#login').classList.add('on')})}
 window.addEventListener('load',startSync);
+
+/* ---------- aviso de versión nueva (no recarga sola y no toca la sesión) ---------- */
+const VERSION_CARGADA=(document.querySelector('meta[name="app-version"]')||{}).content||'';
+async function versionPublicada(){try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return null;return (await r.json()).v||null}catch(e){return null}}
+// El aviso es fijo arriba: la página baja lo que mida el aviso (cambia con el ancho de la pantalla) para que no tape la cabecera.
+function ajustarAviso(){const n=document.getElementById('nueva');document.body.style.paddingTop=n.classList.contains('on')?n.offsetHeight+'px':''}
+window.addEventListener('resize',ajustarAviso);
+function mostrarAvisoVersion(){document.getElementById('nueva').classList.add('on');ajustarAviso();avisoEnDialogo()}
+// Con un formulario emergente abierto el resto de la página queda bloqueada: el aviso también va dentro del formulario.
+function avisoEnDialogo(){const d=document.getElementById('dlg');
+  if(!d||!d.open||!document.getElementById('nueva').classList.contains('on')||d.querySelector('.nueva-dentro'))return;
+  const a=document.createElement('div');a.className='nueva-dentro';a.innerHTML='<b>Hay una versión nueva.</b><span>Terminá y guardá; después tocá Actualizar.</span><button type="button" class="btn lime sm">Actualizar</button>';
+  a.querySelector('button').onclick=()=>location.reload();d.prepend(a)}
+async function chequearVersion(){
+  if(!VERSION_CARGADA||VERSION_CARGADA==='sin-estampar'||document.getElementById('nueva').classList.contains('on'))return;
+  const v=await versionPublicada();if(v&&v!==VERSION_CARGADA)mostrarAvisoVersion()}
+setInterval(chequearVersion,5*60*1000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)chequearVersion()});
+window.addEventListener('focus',chequearVersion);
+window.addEventListener('pageshow',e=>{if(e.persisted)chequearVersion()});   // pestaña recuperada de la memoria del navegador
+setTimeout(chequearVersion,4000);
+document.getElementById('nbtn').onclick=()=>location.reload();                // actualizar nunca toca la sesión
 </script>
 </body>
 </html>

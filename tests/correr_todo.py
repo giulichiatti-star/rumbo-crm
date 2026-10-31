@@ -6,7 +6,7 @@ import sys
 import time
 
 AQUI = pathlib.Path(__file__).resolve().parent
-PRUEBAS = [("Pantallas que cuadran", "pantallas_cuadran_test.py"), ("Fechas aaaa/mm/dd", "fechas_test.py"), ("Cálculos", "calculos_test.py")]
+PRUEBAS = [("Pantallas que cuadran", "pantallas_cuadran_test.py"), ("Fechas aaaa/mm/dd", "fechas_test.py"), ("Cálculos", "calculos_test.py"), ("Aviso de versión nueva", "version_test.py")]
 rojo = []
 for nombre, archivo in PRUEBAS:
     t0 = time.time()

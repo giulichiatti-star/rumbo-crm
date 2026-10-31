@@ -22,3 +22,11 @@ La clave *anon* es pública por diseño. Los datos de cada persona quedan proteg
 ## Qué datos trae
 
 Lotes, precios de mercado, costos, dietas y curvas vienen del Excel. Los precios están marcados "verificar" en el original: revisarlos antes de usarlos con clientes.
+
+## Para quien mantiene el proyecto
+
+**Pruebas** (necesitan Python 3 y Playwright): `python3 tests/correr_todo.py` corre cuatro pruebas: pantallas que cuadran en 13 anchos, fechas aaaa/mm/dd, 113 comprobaciones de cálculo y el aviso de versión nueva. Tarda ~1,5 minutos y tiene que dar todo en verde antes de publicar.
+
+**Aviso de «hay una versión nueva».** Cada versión publicada lleva un identificador, escrito igual en `index.html` (etiqueta `app-version`) y en `version.json`. Quien tiene la app abierta ve un aviso fijo con el botón *Actualizar* cuando el sitio ya tiene una versión más nueva. La página nunca se recarga sola (no se pierde lo que se está cargando) y actualizar no cierra la sesión. El identificador se estampa solo en cada commit que cambia `index.html`, con un hook de git. Instalarlo una vez en cada copia del repositorio:
+
+    cp scripts/hook_pre_commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
