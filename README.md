@@ -16,6 +16,13 @@ Es un solo archivo (`index.html`), sin instalación.
 - Los comentarios de quien prueba llegan a la tabla `rumbo_feedback` (Supabase > Table Editor). Traen la pantalla, la versión y el ancho de pantalla.
 - Un aviso automático (`.github/workflows/mantener-activo.yml`) pide un dato cada 3 días para que Supabase gratis no pause el proyecto. Si igual se pausa, se reactiva con un botón en el panel de Supabase y no se pierde nada.
 
+## Cambiar la estructura de los datos (importante)
+
+Lo que cargó cada persona queda guardado con la forma de la versión que lo guardó. Al abrir la app, `completarDatos()` agrega lo que falte (campos o tablas nuevas) sin tocar lo cargado.
+- **Solo se agrega algo nuevo:** alcanza con agregarlo también en los datos de ejemplo (`seed()`) y, si es un campo de un registro (cliente, lote, tarea, mercado), en `REG_DEFECTO`.
+- **Se renombra, mueve o convierte algo:** subir `ESQUEMA` y escribir la conversión en `MIGRACIONES[número nuevo]`, y actualizar `REG_DEFECTO`.
+- En los dos casos, sumar el cambio a `datos_viejos()` en `tests/datos_viejos_test.py` y correr las pruebas.
+
 ## Publicar un cambio
 
     python3 scripts/publicar.py              # resumen: qué se publicaría
@@ -42,7 +49,7 @@ Lotes, precios de mercado, costos, dietas y curvas vienen del Excel. Los precios
 
 ## Para quien mantiene el proyecto
 
-**Pruebas** (necesitan Python 3 y Playwright): `python3 tests/correr_todo.py` corre cinco pruebas: pantallas que cuadran en 13 anchos, fechas dd/mm/aaaa, 113 comprobaciones de cálculo, el aviso de versión nueva y la sincronización con copias y comentarios. Tarda unos 2 minutos y tiene que dar todo en verde antes de publicar.
+**Pruebas** (necesitan Python 3 y Playwright): `python3 tests/correr_todo.py` corre seis pruebas: pantallas que cuadran en 13 anchos, fechas dd/mm/aaaa, 113 comprobaciones de cálculo, el aviso de versión nueva, la sincronización con copias y comentarios, y que los datos guardados por una versión vieja sigan funcionando. Tarda unos 3 minutos y tiene que dar todo en verde antes de publicar.
 
 **Aviso de «hay una versión nueva».** Cada versión publicada lleva un identificador, escrito igual en `index.html` (etiqueta `app-version`) y en `version.json`. Quien tiene la app abierta ve un aviso fijo con el botón *Actualizar* cuando el sitio ya tiene una versión más nueva. La página nunca se recarga sola (no se pierde lo que se está cargando) y actualizar no cierra la sesión. El identificador se estampa solo en cada commit que cambia `index.html`, con un hook de git. Instalarlo una vez en cada copia del repositorio:
 

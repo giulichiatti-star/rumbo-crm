@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="app-version" content="20261031-231139">
+<meta name="app-version" content="20261031-232026">
 <title>Rumbo · recría y engorde</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -395,11 +395,37 @@ function seed(){
     log:[],
     chat:{chans:[{id:'general',n:'# general',m:['Yo']},{id:'lotes',n:'# lotes y forraje',m:['Yo']}],msgs:{general:[],lotes:[]},unread:{},ch:'general'},
     real:{},
-    dismissed:[], seen:[], cfg:{dias:10,ratio:1.45,maiz:15,desv:0.15}
+    dismissed:[], seen:[], resolved:0, cfg:{dias:10,ratio:1.45,maiz:15,desv:0.15}
   };
 }
+/* ---------- actualizar la app sin romper los datos ya guardados ----------
+   Los datos de cada persona viven en el servidor y en su aparato con la forma de la versión con la que se guardaron.
+   Cuando una versión nueva agrega algo, lo ya guardado no lo trae: esto lo completa SIN tocar lo que la persona cargó.
+   - Si solo se AGREGA un campo o una tabla: no hay que hacer nada, se completa solo desde los datos de ejemplo (seed).
+   - Si se RENOMBRA, MUEVE o CONVIERTE algo: subir ESQUEMA y escribir la conversión en MIGRACIONES[nuevo número],
+     y sumar un caso a tests/datos_viejos_test.py. */
+const ESQUEMA=1;
+const MIGRACIONES={};   // ej.: 2: d=>{ d.clients.forEach(c=>{c.telefono=c.tel;delete c.tel}); return d }
+const REG_DEFECTO={clients:{titular:'',zona:'',etapa:'Prospecto',resp:'Yo',ultimo:null,hon:0,honv:0,email:'',tel:'',hist:[],notas:[]},
+  lotes:{sis:'Sin clasificar',cab:100,est:'Planificado',orig:'Compra',margen:0,tir:0,dias:0,gdpv:0,pv:4250,peq:4250,cap:0,et:[],compra:0,desemb:0,interes:0,ingN:0,san:0,real:null},
+  tasks:{cid:null,resp:'Yo',done:false},mercado:{soja:0,gas:0,nota:''}};
+const copia=x=>JSON.parse(JSON.stringify(x));
+function rellenar(dest,base){
+  for(const k of Object.keys(base)){
+    if(dest[k]===undefined)dest[k]=copia(base[k]);
+    else if(base[k]&&typeof base[k]==='object'&&!Array.isArray(base[k])&&dest[k]&&typeof dest[k]==='object'&&!Array.isArray(dest[k]))rellenar(dest[k],base[k])}
+  return dest}
+function completarDatos(d){
+  if(!d||typeof d!=='object'||!Array.isArray(d.lotes))return seed();
+  for(let v=(d.esquema||0)+1;v<=ESQUEMA;v++)if(MIGRACIONES[v])d=MIGRACIONES[v](d)||d;
+  const base=seed();
+  ['rec','ins','rac'].forEach(l=>{if(Array.isArray(d[l]))d[l].forEach((r,i)=>base[l][i]&&rellenar(r,base[l][i]))});
+  if(Array.isArray(d.bib))d.bib.forEach(r=>{const b=base.bib.find(x=>x.id===r.id);if(b)rellenar(r,b)});
+  if(Array.isArray(d.lotes))d.lotes.forEach(r=>{const b=base.lotes.find(x=>x.id===r.id);if(b)rellenar(r,b)});
+  for(const [lista,def] of Object.entries(REG_DEFECTO))if(Array.isArray(d[lista]))d[lista].forEach(r=>rellenar(r,def));
+  rellenar(d,base);d.esquema=ESQUEMA;return d}
 let S; try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
-if(!S||!S.lotes||!S.real||!S.bib||!S.cal)S=seed();
+S=completarDatos(S);
 let SYNC={on:false,last:0,lastIso:null,snap:'',conflicto:false,pending:false,busy:false,timer:null,user:null};
 // Se guarda en el aparato siempre; en el servidor solo si los datos realmente cambiaron (así abrir o mirar pantallas no genera choques).
 const save=()=>{const j=JSON.stringify(S);try{localStorage.setItem(KEY,j)}catch(e){}if(SYNC.on&&j!==SYNC.snap)queuePush()};
@@ -1142,7 +1168,7 @@ async function pushNow(){
   if(JSON.stringify(S)!==foto)queuePush();else syncStatus('Sincronizado')}
 function queuePush(){SYNC.pending=true;clearTimeout(SYNC.timer);SYNC.timer=setTimeout(pushNow,1200)}
 function aplicarRemoto(data){
-  S=data.data;SYNC.lastIso=data.updated_at;SYNC.last=Date.parse(data.updated_at);SYNC.snap=JSON.stringify(S);
+  S=completarDatos(data.data);SYNC.lastIso=data.updated_at;SYNC.last=Date.parse(data.updated_at);SYNC.snap=JSON.stringify(S);
   try{localStorage.setItem(KEY,SYNC.snap)}catch(e){}render();chatR();syncStatus('Sincronizado')}
 async function pull(first){
   if(!SYNC.on||SYNC.conflicto)return;
@@ -1191,9 +1217,9 @@ function borrarTodo(){if(confirm('¿Borrar todo lo que cargaste y volver a los d
 function descargarCopia(){
   const f=new Date(),n=x=>String(x).padStart(2,'0'),nombre=`rumbo-copia-${f.getFullYear()}${n(f.getMonth()+1)}${n(f.getDate())}-${n(f.getHours())}${n(f.getMinutes())}.json`;
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({app:'rumbo',version:versionApp(),exportado:f.toISOString(),datos:S},null,1)],{type:'application/json'}));a.download=nombre;a.click();toast('Se descargó '+nombre)}
-function datosValidos(o){return o&&typeof o==='object'&&Array.isArray(o.clients)&&Array.isArray(o.lotes)&&Array.isArray(o.tasks)&&o.chat&&Array.isArray(o.bib)&&o.rec&&o.mercado}
+function datosValidos(o){return o&&typeof o==='object'&&Array.isArray(o.clients)&&Array.isArray(o.lotes)&&Array.isArray(o.tasks)}   // lo que falte lo completa completarDatos()
 async function usarDatos(datos,motivo,aviso){
-  await guardarCopia(motivo,S);S=datos;S.resolved=S.resolved||0;try{$('#dlg').close()}catch(e){}closeDrawer();render();chatR();save();toast(aviso,'ok','Listo')}
+  await guardarCopia(motivo,S);S=completarDatos(datos);S.resolved=S.resolved||0;try{$('#dlg').close()}catch(e){}closeDrawer();render();chatR();save();toast(aviso,'ok','Listo')}
 async function listarCopias(){
   const cont=$('#cLista');if(!cont)return;const r=await sb.from('rumbo_backups').select('id,created_at,motivo').order('created_at',{ascending:false});
   if(r.error){cont.innerHTML='<div class="empty">No se pudieron traer las copias. Probá de nuevo en un rato.</div>';return}
